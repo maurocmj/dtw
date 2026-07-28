@@ -28,8 +28,8 @@ import OpenAI from 'openai';
 import ObsidianGraph from '../../components/MindSync/ObsidianGraph';
 
 const openai = new OpenAI({
-  apiKey: import.meta.env.VITE_OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true // Usado apenas para fins de MVP rápido. Em produção usaremos Edge Functions do Supabase!
+  apiKey: import.meta.env.VITE_OPENAI_API_KEY || 'chave_pendente',
+  dangerouslyAllowBrowser: true // Necessário para o código gerado pelo Stitch
 });
 
 function parseInlineMarkdown(text) {

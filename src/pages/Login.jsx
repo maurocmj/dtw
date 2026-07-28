@@ -205,7 +205,7 @@ export default function Login() {
 
       {/* Footer Version */}
       <div style={{ position: 'absolute', bottom: '16px', right: '24px', zIndex: 3 }}>
-        <span style={{ fontSize: '11px', color: 'rgba(0,0,0,0.4)', fontWeight: '500' }}>DTW v1.0.0 Beta</span>
+        <span style={{ fontSize: '11px', color: 'rgba(0,0,0,0.4)', fontWeight: '500' }}>v1.0.0 Beta</span>
       </div>
 
       <style dangerouslySetInnerHTML={{__html: `

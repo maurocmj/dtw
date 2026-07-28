@@ -1825,7 +1825,7 @@ REGRAS CRÍTICAS DE CONDUTA E ESTILO (LEIA COM ATENÇÃO):
                       Sair
                     </button>
                     <div style={{ textAlign: 'center', marginTop: '12px', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>DTW v1.0.0 Beta</span>
+                      <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>v1.0.0 Beta</span>
                     </div>
                   </div>
                 </div>

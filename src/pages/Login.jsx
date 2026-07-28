@@ -202,6 +202,12 @@ export default function Login() {
 
         </div>
       </div>
+
+      {/* Footer Version */}
+      <div style={{ position: 'absolute', bottom: '16px', right: '24px', zIndex: 3 }}>
+        <span style={{ fontSize: '11px', color: 'rgba(0,0,0,0.4)', fontWeight: '500' }}>DTW v1.0.0 Beta</span>
+      </div>
+
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes spin { 100% { transform: rotate(360deg); } }
         @keyframes panBackground {

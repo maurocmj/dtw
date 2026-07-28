@@ -28,7 +28,8 @@ import OpenAI from 'openai';
 import ObsidianGraph from '../../components/MindSync/ObsidianGraph';
 
 const openai = new OpenAI({
-  apiKey: import.meta.env.VITE_OPENAI_API_KEY || 'chave_pendente',
+  apiKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+  baseURL: import.meta.env.VITE_SUPABASE_URL + '/functions/v1/openai-proxy/v1',
   dangerouslyAllowBrowser: true // Necessário para o código gerado pelo Stitch
 });
 

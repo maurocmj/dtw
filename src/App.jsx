@@ -35,8 +35,8 @@ export default function App() {
         <Route path="/login" element={!session ? <Login /> : <Navigate to="/mind-sync" />} />
         
         {/* Rotas Privadas */}
-        <Route path="/mind-sync" element={session ? <BasicForm /> : <Navigate to="/login" />} />
-        <Route path="/mind-sync/chat" element={session ? <Chatbot /> : <Navigate to="/login" />} />
+        <Route path="/mind-sync" element={session ? <Chatbot /> : <Navigate to="/login" />} />
+        <Route path="/mind-sync/setup" element={session ? <BasicForm /> : <Navigate to="/login" />} />
         
         <Route path="/" element={<Navigate to={session ? "/mind-sync" : "/login"} />} />
       </Routes>

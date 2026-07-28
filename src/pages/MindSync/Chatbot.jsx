@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Button } from '../../components/ui/Button';
 import JSZip from 'jszip';
@@ -298,6 +299,7 @@ function Mermaid({ chart }) {
 const TOTAL_QUESTIONS = 5; // Excluindo o formulário que é o Pilar 1
 
 export default function Chatbot() {
+  const navigate = useNavigate();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -390,6 +392,11 @@ export default function Chatbot() {
           .eq('id', user.id)
           .single();
         
+        if (!prof || !prof.job_title || !prof.industry || !prof.education) {
+          navigate('/mind-sync/setup');
+          return;
+        }
+        
         setProfile(prof);
 
         // Puxar documentos associados ao usuário
@@ -477,7 +484,7 @@ Como líder nesta organização, você enfrenta dilemas constantes. Para calibra
       }
     }
     init();
-  }, []);
+  }, [navigate]);
 
   // Rolar para baixo a cada nova mensagem
   useEffect(() => {
@@ -718,71 +725,82 @@ Como líder nesta organização, você enfrenta dilemas constantes. Para calibra
       alert("Por favor, envie pelo menos um arquivo antes de mapear processos.");
       return;
     }
+
     setMappingProcessesLoading(true);
+    let totalFound = 0;
     try {
-      // Deletar processos antigos e chunks antigos para começar limpo
-      await supabase
-        .from('dtw_processes')
-        .delete()
-        .eq('user_id', profile.id);
+      // 1. Filtrar apenas arquivos que ainda não foram analisados
+      const filesToProcess = uploadedFiles.filter(f => !f.is_processed);
 
-      await supabase
-        .from('dtw_document_chunks')
-        .delete()
-        .eq('user_id', profile.id);
+      if (filesToProcess.length === 0) {
+        alert("Todos os arquivos já foram analisados. Nenhum novo dado a processar!");
+        setMappingProcessesLoading(false);
+        return;
+      }
 
-      for (const fileDoc of uploadedFiles) {
-        let extractedText = '';
+      for (const fileDoc of filesToProcess) {
         try {
-          const urlParts = fileDoc.file_url.split('/public/dtw-documents/');
-          if (urlParts.length > 1) {
-            const storagePath = decodeURIComponent(urlParts[1]);
-            const { data: fileBlob, error: downloadError } = await supabase.storage
-              .from('dtw-documents')
-              .download(storagePath);
+          // Limpar processos e chunks apenas deste arquivo específico antes de mapear
+          await supabase
+            .from('dtw_processes')
+            .delete()
+            .eq('file_id', fileDoc.id);
 
-            if (downloadError) throw downloadError;
+          await supabase
+            .from('dtw_document_chunks')
+            .delete()
+            .eq('document_id', fileDoc.id);
 
-            if (fileDoc.file_name.endsWith('.zip')) {
-              const zip = await JSZip.loadAsync(fileBlob);
-              let txtFile = Object.keys(zip.files).find(name => name.toLowerCase().includes('_chat.txt'));
-              if (!txtFile) {
-                txtFile = Object.keys(zip.files).find(name => name.endsWith('.txt'));
+          let extractedText = fileDoc.extracted_text || '';
+
+          if (!extractedText) {
+            const urlParts = fileDoc.file_url.split('/public/dtw-documents/');
+            if (urlParts.length > 1) {
+              const storagePath = decodeURIComponent(urlParts[1]);
+              const { data: fileBlob, error: downloadError } = await supabase.storage
+                .from('dtw-documents')
+                .download(storagePath);
+
+              if (downloadError) throw downloadError;
+
+              if (fileDoc.file_name.endsWith('.zip')) {
+                const zip = await JSZip.loadAsync(fileBlob);
+                let txtFile = Object.keys(zip.files).find(name => name.toLowerCase().includes('_chat.txt'));
+                if (!txtFile) {
+                  txtFile = Object.keys(zip.files).find(name => name.endsWith('.txt'));
+                }
+                if (txtFile) {
+                  extractedText = await zip.files[txtFile].async('string');
+                }
+              } else if (fileDoc.file_name.endsWith('.txt') || fileDoc.file_name.endsWith('.csv') || fileDoc.file_name.endsWith('.eml')) {
+                extractedText = await fileBlob.text();
               }
-              if (txtFile) {
-                extractedText = await zip.files[txtFile].async('string');
+
+              // Atualizar o dtw_documents com o texto extraído para retrocompatibilidade
+              if (extractedText) {
+                await supabase
+                  .from('dtw_documents')
+                  .update({ extracted_text: extractedText })
+                  .eq('id', fileDoc.id);
+
+                // Vetorizar no lote (RAG)
+                await vectorizeDocument(fileDoc.id, profile.id, extractedText);
               }
-            } else if (fileDoc.file_name.endsWith('.txt')) {
-              extractedText = await fileBlob.text();
-            }
-
-            // Atualizar o dtw_documents com o texto extraído para retrocompatibilidade
-            if (extractedText) {
-              await supabase
-                .from('dtw_documents')
-                .update({ extracted_text: extractedText })
-                .eq('id', fileDoc.id);
-
-              // Vetorizar no lote (RAG)
-              await vectorizeDocument(fileDoc.id, profile.id, extractedText);
             }
           }
-        } catch (fetchErr) {
-          console.error(`Erro ao carregar/ler arquivo ${fileDoc.file_name}:`, fetchErr);
-        }
 
-        if (!extractedText) {
-          extractedText = `Análise do documento: ${fileDoc.file_name}. Identifique processos de negócio que possam estar relacionados ao nome do arquivo e à sua área funcional.`;
-        }
+          if (!extractedText) {
+            extractedText = `Análise do documento: ${fileDoc.file_name}. Identifique processos de negócio que possam estar relacionados ao nome do arquivo e à sua área funcional.`;
+          }
 
-        const textSample = extractedText.substring(0, 12000);
+          const textSample = extractedText.substring(0, 12000);
 
-        const analysisCompletion = await openai.chat.completions.create({
-          model: "gpt-4o",
-          messages: [
-            { 
-              role: "system", 
-              content: `Você é um Analista de Processos de Negócio (BPMN). Analise o texto do arquivo enviado pelo usuário e identifique processos operacionais, de liderança, vendas, atendimento, produto ou administrativos discutidos ou implícitos.
+          const analysisCompletion = await openai.chat.completions.create({
+            model: "gpt-4o",
+            messages: [
+              { 
+                role: "system", 
+                content: `Você é um Analista de Processos de Negócio (BPMN). Analise o texto do arquivo enviado pelo usuário e identifique processos operacionais, de liderança, vendas, atendimento, produto ou administrativos discutidos ou implícitos.
 Retorne um objeto JSON contendo uma lista de processos mapeados. O formato deve ser exatamente:
 {
   "processes": [
@@ -798,25 +816,38 @@ Retorne um objeto JSON contendo uma lista de processos mapeados. O formato deve 
   ]
 }
 Se nenhum processo for identificado, retorne {"processes": []}.`
-            },
-            { role: "user", content: `Arquivo: ${fileDoc.file_name}\nConteúdo:\n${textSample}` }
-          ],
-          response_format: { type: "json_object" },
-          temperature: 0.2
-        });
+              },
+              { role: "user", content: `Arquivo: ${fileDoc.file_name}\nConteúdo:\n${textSample}` }
+            ],
+            response_format: { type: "json_object" },
+            temperature: 0.2
+          });
 
-        const analysisResult = JSON.parse(analysisCompletion.choices[0].message.content);
-        if (analysisResult.processes && analysisResult.processes.length > 0) {
-          for (const proc of analysisResult.processes) {
-            await supabase.from('dtw_processes').insert({
-              user_id: profile.id,
-              file_id: fileDoc.id,
-              title: proc.title,
-              description: proc.description,
-              steps: proc.steps,
-              flowchart: proc.flowchart
-            });
+          const analysisResult = JSON.parse(analysisCompletion.choices[0].message.content);
+          if (analysisResult.processes && analysisResult.processes.length > 0) {
+            totalFound += analysisResult.processes.length;
+            for (const proc of analysisResult.processes) {
+              const { error: insertErr } = await supabase.from('dtw_processes').insert({
+                user_id: profile.id,
+                file_id: fileDoc.id,
+                title: proc.title,
+                description: proc.description,
+                steps: proc.steps,
+                flowchart: proc.flowchart
+              });
+              if (insertErr) throw insertErr;
+            }
           }
+
+          // Marcar como processado no banco
+          await supabase
+            .from('dtw_documents')
+            .update({ is_processed: true })
+            .eq('id', fileDoc.id);
+
+        } catch (fileErr) {
+          console.error(`Erro ao mapear processos para o arquivo ${fileDoc.file_name}:`, fileErr);
+          alert(`Erro no arquivo "${fileDoc.file_name}": ` + (fileErr.message || fileErr));
         }
       }
 
@@ -831,10 +862,14 @@ Se nenhum processo for identificado, retorne {"processes": []}.`
         setUploadedFiles(docs);
       }
 
-      alert("Mapeamento de processos concluído com sucesso!");
+      if (totalFound > 0) {
+        alert(`Mapeamento inteligente de processos concluído! Foram identificados e mapeados ${totalFound} processos.`);
+      } else {
+        alert("Mapeamento inteligente de processos concluído. Nenhum novo processo de negócio foi identificado nos arquivos pendentes.");
+      }
     } catch (err) {
       console.error("Erro ao mapear processos:", err);
-      alert("Erro ao realizar análise de processos. Tente novamente.");
+      alert("Erro ao realizar análise de processos: " + (err.message || err));
     } finally {
       setMappingProcessesLoading(false);
     }
@@ -1084,6 +1119,15 @@ Se nenhum processo novo ou alterado for identificado, retorne {"processes": []}.
       } catch (apiErr) {
         console.error('Erro na análise de processos com IA:', apiErr);
       }
+
+      // Marcar como processado no banco e atualizar estado local
+      await supabase
+        .from('dtw_documents')
+        .update({ is_processed: true })
+        .eq('id', dbData.id);
+
+      setUploadedFiles(prev => prev.map(f => f.id === dbData.id ? { ...f, is_processed: true } : f));
+
     } catch (err) {
       console.error('Erro ao fazer upload:', err);
       alert('Erro ao enviar arquivo. Tente novamente.');
@@ -1826,7 +1870,7 @@ REGRAS CRÍTICAS DE CONDUTA E ESTILO (LEIA COM ATENÇÃO):
                       Sair
                     </button>
                     <div style={{ textAlign: 'center', marginTop: '12px', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>v1.0.0 Beta</span>
+                      <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>v1.0.1</span>
                     </div>
                   </div>
                 </div>
@@ -2523,6 +2567,118 @@ REGRAS CRÍTICAS DE CONDUTA E ESTILO (LEIA COM ATENÇÃO):
 
           </div>
         </div>
+
+        {/* MODAL DE CONTEXTO DO UPLOAD */}
+        {pendingUpload && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(17, 24, 39, 0.75)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            animation: 'fadeIn 0.2s ease-out'
+          }}>
+            <div style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '16px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              width: '100%',
+              maxWidth: '480px',
+              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              border: '1px solid #e5e7eb',
+              transform: 'scale(1)',
+              transition: 'transform 0.2s ease-out'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#eef6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent)' }}>
+                  <FileText size={18} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: 'var(--color-text-primary)' }}>Descreva o Significado</h3>
+                  <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>Ensine o contexto ao seu clone cognitivo</span>
+                </div>
+              </div>
+
+              <div style={{ backgroundColor: '#f3f4f6', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: 'var(--color-text-primary)', wordBreak: 'break-all', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <span style={{ fontWeight: '600', color: 'var(--color-text-secondary)' }}>Arquivo:</span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{pendingUpload.file.name}</span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '12.5px', fontWeight: '600', color: 'var(--color-text-primary)' }}>Contexto de Negócio / Objetivo:</label>
+                <textarea
+                  autoFocus
+                  rows={3}
+                  placeholder="Ex: Reunião com Igor da Lanum para alinhar cronograma de entrega do projeto, ou E-mail com sócio discutindo contratações de Engenharia..."
+                  value={pendingUpload.description}
+                  onChange={(e) => setPendingUpload(prev => ({ ...prev, description: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    borderRadius: '8px',
+                    border: '1px solid #d1d5db',
+                    padding: '10px 12px',
+                    fontSize: '13px',
+                    outline: 'none',
+                    fontFamily: 'inherit',
+                    resize: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '4px' }}>
+                <button
+                  type="button"
+                  onClick={() => setPendingUpload(null)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #d1d5db',
+                    color: 'var(--color-text-primary)',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = '#ffffff'}
+                >
+                  Cancelar
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={executePendingUpload}
+                  style={{
+                    padding: '8px 18px',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    backgroundColor: 'var(--color-accent)',
+                    border: 'none',
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = '#005bb2'}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--color-accent)'}
+                >
+                  Confirmar Envio
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

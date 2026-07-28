@@ -33,7 +33,7 @@ export default function BasicForm() {
         if (data) {
           if (data.job_title && data.industry && data.education) {
             // Se já tem dados base, podemos pular pro chat (ou permitir editar)
-            navigate('/mind-sync/chat');
+            navigate('/mind-sync');
           } else {
             setFormData({
               name: data.name || user.user_metadata?.full_name || '',
@@ -68,7 +68,7 @@ export default function BasicForm() {
       if (error) throw error;
       
       // Ir para o chat
-      navigate('/mind-sync/chat');
+      navigate('/mind-sync');
     } catch (error) {
       console.error('Erro ao salvar perfil:', error);
       alert('Ocorreu um erro ao salvar seus dados.');

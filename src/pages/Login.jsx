@@ -1,6 +1,89 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Mail, ArrowRight, BrainCircuit, Check, KeyRound } from 'lucide-react';
+import Particles, { ParticlesProvider } from "@tsparticles/react";
+import { loadSlim } from "@tsparticles/slim";
+
+const particlesInit = async (engine) => {
+  await loadSlim(engine);
+};
+
+const particlesOptions = {
+  fullScreen: {
+    enable: true,
+    zIndex: 1,
+  },
+  fpsLimit: 120,
+  interactivity: {
+    detectsOn: "window",
+    events: {
+      onHover: {
+        enable: true,
+        mode: "grab",
+      },
+    },
+    modes: {
+      grab: {
+        distance: 140,
+        links: {
+          opacity: 0.8,
+          color: "#002d80",
+        },
+      },
+    },
+  },
+  particles: {
+    color: {
+      value: "#002d80", // Fallback for tsParticles v2/v3
+    },
+    paint: {
+      fill: {
+        color: {
+          value: "#002d80", // Supported in tsParticles v4
+        },
+        enable: true,
+        opacity: {
+          min: 0.5,
+          max: 0.85,
+        },
+      },
+    },
+    links: {
+      color: "#002d80",
+      distance: 130,
+      enable: true,
+      opacity: 0.38,
+      width: 1.2,
+    },
+    move: {
+      direction: "none",
+      enable: true,
+      outModes: {
+        default: "out",
+      },
+      random: false,
+      speed: 0.8,
+      straight: false,
+    },
+    number: {
+      density: {
+        enable: true,
+        area: 800,
+      },
+      value: 120,
+    },
+    opacity: {
+      value: { min: 0.5, max: 0.85 }, // Fallback for tsParticles v2/v3
+    },
+    shape: {
+      type: "circle",
+    },
+    size: {
+      value: { min: 1, max: 3 },
+    },
+  },
+  detectRetina: true,
+};
 
 export default function Login() {
   const [loading, setLoading] = useState(false);
@@ -55,45 +138,33 @@ export default function Login() {
   };
 
   return (
-    <div style={{ position: 'relative', minHeight: '100vh', width: '100vw', backgroundColor: '#f5f5f7', overflow: 'hidden' }}>
+    <div style={{ 
+      position: 'relative', 
+      minHeight: '100vh', 
+      width: '100vw', 
+      backgroundColor: '#ffffff', 
+      backgroundImage: 'linear-gradient(rgba(0, 0, 0, 0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 0, 0, 0.025) 1px, transparent 1px)',
+      backgroundSize: '5px 5px',
+      overflow: 'hidden' 
+    }}>
       
-      {/* Background Image with Pan effect */}
-      <div style={{ 
-        position: 'absolute', 
-        top: '-5%', 
-        left: '-5%', 
-        width: '110vw', 
-        height: '110vh', 
-        backgroundImage: 'url("/mindsync_bg.jpg")',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        filter: 'blur(8px) brightness(1.02)',
-        zIndex: 0,
-        animation: 'panBackground 40s linear infinite alternate'
-      }} />
 
-      {/* Smooth radial gradient overlay to focus center card */}
-      <div style={{ 
-        position: 'absolute', 
-        top: 0, 
-        left: 0, 
-        right: 0, 
-        bottom: 0, 
-        background: 'radial-gradient(circle at center, rgba(251, 251, 253, 0.45) 0%, rgba(251, 251, 253, 0.85) 100%)',
-        zIndex: 1 
-      }} />
 
-      {/* Subtle organic light spots on top of background */}
-      <div style={{ 
-        position: 'absolute', top: '10%', left: '20%', width: '40vw', height: '40vw', 
-        background: 'radial-gradient(circle, rgba(0, 113, 227, 0.12) 0%, rgba(251,251,253,0) 70%)',
-        borderRadius: '50%', zIndex: 1 
-      }} />
-      <div style={{ 
-        position: 'absolute', bottom: '10%', right: '10%', width: '45vw', height: '45vw', 
-        background: 'radial-gradient(circle, rgba(0, 113, 227, 0.08) 0%, rgba(251,251,253,0) 70%)',
-        borderRadius: '50%', zIndex: 1 
-      }} />
+      {/* Interactive Particles (Neural Network / Constellation) */}
+      <ParticlesProvider init={particlesInit}>
+        <Particles
+          id="tsparticles"
+          options={particlesOptions}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            zIndex: 1,
+          }}
+        />
+      </ParticlesProvider>
 
       {/* Main Content Overlay */}
       <div 
@@ -118,13 +189,13 @@ export default function Login() {
             gap: '32px', 
             flexWrap: 'wrap', 
             justifyContent: 'center',
-            background: 'rgba(255, 255, 255, 0.65)',
-            backdropFilter: 'blur(25px)',
-            WebkitBackdropFilter: 'blur(25px)',
+            background: 'rgba(255, 255, 255, 0.84)',
+            backdropFilter: 'blur(30px)',
+            WebkitBackdropFilter: 'blur(30px)',
             padding: '48px 56px',
             borderRadius: '24px',
-            border: '1px solid rgba(255, 255, 255, 0.45)',
-            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
+            border: '1px solid rgba(255, 255, 255, 0.75)',
+            boxShadow: '0 24px 64px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.95)',
             maxWidth: '90%',
             animation: 'cardFadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards'
           }}
@@ -205,16 +276,11 @@ export default function Login() {
 
       {/* Footer Version */}
       <div style={{ position: 'absolute', bottom: '16px', right: '24px', zIndex: 3 }}>
-        <span style={{ fontSize: '11px', color: 'rgba(0,0,0,0.4)', fontWeight: '500' }}>v1.0.0 Beta</span>
+        <span style={{ fontSize: '11px', color: 'rgba(0,0,0,0.4)', fontWeight: '500' }}>v1.0.1</span>
       </div>
 
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes spin { 100% { transform: rotate(360deg); } }
-        @keyframes panBackground {
-          0% { transform: scale(1.05) translate(0, 0); }
-          50% { transform: scale(1.1) translate(-1%, -1%); }
-          100% { transform: scale(1.05) translate(1%, 1%); }
-        }
         @keyframes cardFadeIn {
           from { opacity: 0; transform: translateY(16px); }
           to { opacity: 1; transform: translateY(0); }
